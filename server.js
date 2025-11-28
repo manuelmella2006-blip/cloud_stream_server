@@ -67,7 +67,7 @@ app.post('/frame', (req, res) => {
   }
 });
 
-// Manejar conexiones de clientes (apps Android)
+// Manejar conexiones de clientes (apps Android / navegadores)
 io.on('connection', (socket) => {
   clientCount++;
   console.log(`📱 Cliente conectado: ${socket.id} (Total: ${clientCount})`);
@@ -88,7 +88,7 @@ io.on('connection', (socket) => {
   });
 });
 
-// Ruta de información del servidor
+// Ruta raíz con info
 app.get('/', (req, res) => {
   res.json({
     name: 'Parking Stream Server',
@@ -97,24 +97,59 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/health',
       frame_upload: '/frame (POST)',
+      viewer: '/viewer',
       websocket: 'socket.io'
     },
     stats: {
       connected_clients: clientCount,
       total_frames_received: frameCount,
       has_current_frame: currentFrame !== null
-    },
-    usage: {
-      python_upload: 'POST /frame con { "frame": "base64_string" }',
-      client_connect: 'Conectar via Socket.IO y escuchar "video-frame"'
     }
   });
 });
 
-const PORT = process.env.PORT || 3000;
+// 🔥 VIEWER HTML para ver el video desde cualquier navegador / WebView
+app.get('/viewer', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8" />
+        <title>Streaming Parking</title>
+        <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    </head>
+    <body style="background:#111; color:#fff; text-align:center; margin:0; padding:0;">
+        <h2 style="font-family:sans-serif;">📡 Streaming desde Render</h2>
+        <img id="video" style="width:90%; max-width:600px; border:2px solid #fff;">
+
+        <script>
+            // Se conecta al mismo dominio de donde se sirve la página
+            const socket = io();
+
+            socket.on("connect", () => {
+                console.log("🔌 Conectado a servidor de streaming");
+            });
+
+            socket.on("video-frame", (frameBase64) => {
+                const img = document.getElementById("video");
+                img.src = "data:image/jpeg;base64," + frameBase64;
+            });
+
+            socket.on("disconnect", () => {
+                console.log("❌ Desconectado del servidor");
+            });
+        </script>
+    </body>
+    </html>
+  `);
+});
+
+// Inicio del servidor (Render define el puerto en process.env.PORT)
+const PORT = process.env.PORT || 10000;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Servidor de streaming ejecutándose en puerto ${PORT}`);
-  console.log(`🌐 Health check: http://localhost:${PORT}/health`);
-  console.log(`📡 WebSocket ready para conexiones`);
-  console.log(`📤 Endpoint para Python: http://localhost:${PORT}/frame`);
+  console.log(\`🚀 Servidor de streaming ejecutándose en puerto \${PORT}\`);
+  console.log(\`🌐 Health check: http://localhost:\${PORT}/health\`);
+  console.log(\`📡 WebSocket listo para conexiones\`);
+  console.log(\`📤 Punto final para Python : http://localhost:\${PORT}/frame\`);
+  console.log(\`🖥️ Viewer disponible en /viewer\`);
 });
